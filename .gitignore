@@ -1,8 +1,8 @@
-*.class
-
-# Package Files #
-*.jar
-*.war
-*.ear
-
-.DS_STORE
+/*
+!lib/*
+!src/*
+!ant_init.sh
+!build.XML
+!LICENSE
+!README.md
+!test*
