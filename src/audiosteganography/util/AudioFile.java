@@ -293,6 +293,15 @@ public class AudioFile {
 	}
 
 	/**
+	 * Gets the format of the audio
+	 *
+	 * @return The format of the audio
+	 */
+	public AudioFormat getFormat() {
+		return format;
+	}
+
+	/**
 	 * Gets the sample rate of the audio
 	 *
 	 * @return The number of samples per second

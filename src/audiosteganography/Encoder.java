@@ -2,140 +2,146 @@ package audiosteganography;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
-import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioFileFormat.Type;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
-import audiosteganography.audio.AudioSampleReader;
 import audiosteganography.audio.AudioSampleWriter;
 import audiosteganography.audio.AudioTool;
+import audiosteganography.binary.BinaryTool;
 import audiosteganography.fourier.Complex;
 import audiosteganography.fourier.FFT;
 import audiosteganography.fourier.FFTData;
 import audiosteganography.fourier.FFTDataAnalyzer;
 import audiosteganography.util.AudioFile;
-import audiosteganography.binary.BinaryTool;
+import audiosteganography.util.AudioStream;
 
 public class Encoder {
-	File audioFile;
+	final File audioFile;
 
 	public Encoder(File audioFile) {
 		this.audioFile = audioFile;
 	}
 
-	public void encodeMessage(String message, String outPath) throws IOException, UnsupportedAudioFileException { //change outPath to File
+	public void encodeMessage(String message, String outPath) { //change outPath to File
 		int[] messageAsBits = BinaryTool.ASCIIToBinary(message).getIntArray();
-		int currentBit = 0;
-		float[] dataFloat = new AudioFile(audioFile).streamAll();
-		double[] audioData = new double[dataFloat.length];
-		for (int i = 0 ; i<dataFloat.length ; i++) {
-			audioData[i] = dataFloat[i];
+		boolean[] messageAsBinary = new boolean[messageAsBits.length];
+
+		for (int i = 0; i < messageAsBits.length; i++) {
+			messageAsBinary[i] = messageAsBits[i] == 1;
 		}
-		int bytesRead = 0;
-		int totalBytes = audioData.length;
-		double[] out = new double[totalBytes];
-		int bytesToRead=4096*2; //some aribituary number thats 2^n
+
+		encodeMessage(messageAsBinary, new File(outPath));
+	}
+
+	public void encodeMessage(boolean[] messageAsBits, File to) {
 		try {
-			AudioSampleReader sampleReader = new AudioSampleReader(audioFile);
-			/*int bytesRead = 0;
-	    	int nbChannels = sampleReader.getFormat().getChannels();
-			int totalBytes = (int) sampleReader.getSampleCount()*nbChannels;
-			double[] out = new double[totalBytes];
-			int bytesToRead=4096*2; //some aribituary number thats 2^n
-	   		double[] audioData = new double[totalBytes];
-	    	sampleReader.getInterleavedSamples(0, totalBytes, audioData);*/
+			AudioFile audioFile = new AudioFile(this.audioFile);
 
-			if (totalBytes/bytesToRead<messageAsBits.length) {
-				throw new RuntimeException("The audio file is too short for the message to fit!");
-			}
+			try (AudioStream audio = audioFile.getSampleStream(); AudioSampleWriter writer = new AudioSampleWriter(to, audioFile.getFormat(), Type.WAVE)) {
+				long bytesRead = 0;
+				long totalBytes = audio.getLength();
 
-			while (bytesRead<totalBytes && currentBit<messageAsBits.length) {
-				if (totalBytes-bytesRead<bytesToRead) {
-					bytesToRead = totalBytes-bytesRead;
+				int bytesToRead = 4096 * 2; //some arbitrary number thats 2^n
+				if (totalBytes / bytesToRead < messageAsBits.length) {
+					throw new RuntimeException("The audio file is too short for the message to fit!");
 				}
 
-				//System.out.println("Reading data.");
-				//take a portion of the data
-				double[] samples = new double[bytesToRead];
-				for (int i = 0 ; i<samples.length ; i++) {
-					samples[i] = audioData[bytesRead+i];
-				}
-				bytesRead+=bytesToRead;
-				double[] channelOne = new double[samples.length/2];
-				for (int i = 0 ; i < samples.length ; i += 2) {
-					channelOne[i/2] = samples[i];
-				}
-				//sampleReader.getChannelSamples(0, samples, channelOne);
-				//System.out.println("Taking the FFT.");
-				//take the FFT
-				FFTData[] freqMag = FFT.getMag(channelOne, 44100); // TODO: don't hardcode
-				FFTDataAnalyzer analyzer = new FFTDataAnalyzer(freqMag);
-				boolean isRest = analyzer.isRest();
+				int currentBit = 0;
+				while (bytesRead < totalBytes && currentBit < messageAsBits.length) {
+					if (totalBytes - bytesRead < bytesToRead) {
+						//If the remaining bytes are less than bytesToRead there will be no overflow casting back to an int
+						bytesToRead = (int) (totalBytes - bytesRead);
+					}
 
-				channelOne = FFT.correctDataLength(channelOne);
-				Complex[] complexData = new Complex[channelOne.length];
-				for (int i = 0 ; i<channelOne.length ; i++) {
-					complexData[i] = new Complex(channelOne[i], 0);
-				}
-				Complex[] complexMags = FFT.fft(complexData);
-				double[] freqs = FFT.getFreqs(complexData.length, 44100); // TODO: don't hardcode
+					//System.out.println("Reading data.");
+					//take a portion of the data
+					float[] rawSamples = new float[bytesToRead];
+					audio.next(rawSamples);
 
-				//System.out.println("Writing the 1 or 0");
-				//decide if the overtone should be changed and if so, change it. don't write if its a rest
-				if (messageAsBits[currentBit]==1 && isRest==false) {
-					//edit the data thats going to be ifft'd
-					for (int i = 0 ; i<freqs.length ; i++) {
-						if (Math.abs(Math.abs(freqs[i])-20000)<5) { //lets try changing a set freq
-							complexMags[i] = new Complex(15, 0); // don't hardcode
+					double[] samples = new double[bytesToRead];
+					for (int i = 0; i < samples.length; i++) {
+						samples[i] = rawSamples[i];
+					}
+					bytesRead += bytesToRead;
+
+					double[] channelOne = new double[samples.length / 2];
+					for (int i = 0; i < samples.length; i += 2) {
+						channelOne[i / 2] = samples[i];
+					}
+
+					//System.out.println("Taking the FFT.");
+					//take the FFT
+					FFTData[] freqMag = FFT.getMag(channelOne, 44100); // TODO: don't hardcode
+					FFTDataAnalyzer analyzer = new FFTDataAnalyzer(freqMag);
+					boolean isRest = analyzer.isRest();
+
+					channelOne = FFT.correctDataLength(channelOne);
+					Complex[] complexData = new Complex[channelOne.length];
+					for (int i = 0; i < channelOne.length; i++) {
+						complexData[i] = new Complex(channelOne[i], 0);
+					}
+					Complex[] complexMags = FFT.fft(complexData);
+					double[] freqs = FFT.getFreqs(complexData.length, 44100); // TODO: don't hardcode
+
+					//System.out.println("Writing the 1 or 0");
+					//decide if the overtone should be changed and if so, change it. don't write if its a rest
+					if (!isRest) {
+						if (messageAsBits[currentBit]) {
+							//edit the data thats going to be ifft'd
+							for (int i = 0; i < freqs.length; i++) {
+								if (Math.abs(Math.abs(freqs[i]) - 20000) < 5) { //lets try changing a set freq
+									complexMags[i] = new Complex(15, 0); // don't hardcode
+								}
+							}
+
+							//take the IFFT
+							Complex[] ifft = FFT.ifft(complexMags);
+
+							//change ifft data from complex to real. put in fft class?
+							double[] ifftReal = Arrays.stream(ifft).mapToDouble(Complex::re).toArray();
+
+							double[] toWrite = AudioTool.interleaveSamples(ifftReal);
+							writer.write(toWrite); //add to the array thats going to be written out
+						} else {
+							//add a 0 to the message
+							writer.write(samples);
 						}
+						currentBit++;
+					} else {// similar to encoding a zero, but don't increment the bit count
+						writer.write(samples);
 					}
+				}
 
-					//take the IFFT
-					Complex[] ifft = FFT.ifft(complexMags);
+				//writing out the leftover part of the audio file (which doesn't have any encoded btis in it)
+				if (bytesRead < totalBytes) {
+					float[] buffer = new float[bytesToRead];
 
-					//change ifft data from complex to real. put in fft class?
-					double[] ifftReal = new double[ifft.length];
-					for (int i = 0 ; i < ifftReal.length ; i++) {
-						ifftReal[i]=ifft[i].re();
+					int read;
+					while ((read = audio.next(buffer)) != -1) {
+						double[] extra = new double[read / (audioFile.getSampleBitDepth() / 8)];
+
+						//take a portion of the data
+						for (int i = 0; i < extra.length; i++) {
+							extra[i] = buffer[i];
+						}
+						for (int i = extra.length; i < buffer.length; i++) {
+							if (buffer[i] != 0) {
+								throw new AssertionError("Dropped some of extra buffer: " + Arrays.copyOfRange(buffer, extra.length, buffer.length) + " after reading " + read);
+							}
+						}
+
+						writer.write(extra);
 					}
-
-					double[] toWrite = AudioTool.interleaveSamples(ifftReal);
-					System.arraycopy(toWrite, 0, out, bytesRead-bytesToRead, toWrite.length); //add to the array thats going to be written out
-					currentBit++;
-				} else if (messageAsBits[currentBit] == 0 && !isRest) {
-					//add a 0 to the message
-					System.arraycopy(samples, 0, out, bytesRead-bytesToRead, samples.length);
-					currentBit++;
-				} else if (isRest) { // similar to encoding a zero, but don't increment the bit count
-					System.arraycopy(samples, 0, out, bytesRead-bytesToRead, samples.length);
 				}
 			}
-
-			//writing out the leftover part of the audio file (which doesn't have any encoded btis in it)
-			if (bytesRead<totalBytes) {
-				double[] leftoverData = new double[totalBytes-bytesRead];
-				//take a portion of the data
-				for (int i = 0 ; i<leftoverData.length ; i++) {
-					leftoverData[i] = audioData[bytesRead+i];
-				}
-				System.arraycopy(leftoverData, 0, out, bytesRead, leftoverData.length);
-			}
-
-			/*float[] outFloat = new float[out.length];
-			for (int i = 0 ; i < outFloat.length ; i++) {
-				outFloat[i] = (float) out[i];
-			}
-            Write.audio(outFloat, outPath);*/
-			File outFile = new File(outPath);
-			AudioSampleWriter audioWriter = new AudioSampleWriter(outFile, sampleReader.getFormat(), AudioFileFormat.Type.WAVE);
-			audioWriter.write(out);
-			audioWriter.close();
-		} catch (Exception e) {
+		} catch (IOException | UnsupportedAudioFileException e) {
 			e.printStackTrace();
 		}
 	}
 
-	public static void main(String args[]) throws IOException, UnsupportedAudioFileException {
+	public static void main(String args[]) {
 		String message = args[0];
 		String filePath = args[1];
 		String outPath = filePath.substring(0,filePath.length()-4)+"-Encoded.wav";
