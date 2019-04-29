@@ -1,7 +1,11 @@
 package audiosteganography;
 
-import java.io.*;
-import javax.sound.sampled.*;
+import java.io.File;
+import java.io.IOException;
+
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.UnsupportedAudioFileException;
+
 import audiosteganography.audio.AudioSampleReader;
 import audiosteganography.audio.AudioSampleWriter;
 import audiosteganography.audio.AudioTool;
@@ -11,7 +15,6 @@ import audiosteganography.fourier.FFTData;
 import audiosteganography.fourier.FFTDataAnalyzer;
 import audiosteganography.util.AudioFile;
 import audiosteganography.binary.BinaryTool;
-import jm.util.*;
 
 public class Encoder {
 	File audioFile;
@@ -23,15 +26,15 @@ public class Encoder {
 	public void encodeMessage(String message, String outPath) throws IOException, UnsupportedAudioFileException { //change outPath to File
 		int[] messageAsBits = BinaryTool.ASCIIToBinary(message).getIntArray();
 		int currentBit = 0;
-        	float[] dataFloat = new AudioFile(audioFile).streamAll();     	
-        	double[] audioData = new double[dataFloat.length];
-        	for (int i = 0 ; i<dataFloat.length ; i++) {
-        		audioData[i] = (double) dataFloat[i];
-        	}
-        	int bytesRead = 0;
-			int totalBytes = audioData.length;
-			double[] out = new double[totalBytes];
-			int bytesToRead=4096*2; //some aribituary number thats 2^n
+		float[] dataFloat = new AudioFile(audioFile).streamAll();
+		double[] audioData = new double[dataFloat.length];
+		for (int i = 0 ; i<dataFloat.length ; i++) {
+			audioData[i] = dataFloat[i];
+		}
+		int bytesRead = 0;
+		int totalBytes = audioData.length;
+		double[] out = new double[totalBytes];
+		int bytesToRead=4096*2; //some aribituary number thats 2^n
 		try {
 			AudioSampleReader sampleReader = new AudioSampleReader(audioFile);
 			/*int bytesRead = 0;
@@ -62,7 +65,7 @@ public class Encoder {
 				for (int i = 0 ; i < samples.length ; i += 2) {
 					channelOne[i/2] = samples[i];
 				}
-	    		//sampleReader.getChannelSamples(0, samples, channelOne); 
+				//sampleReader.getChannelSamples(0, samples, channelOne);
 				//System.out.println("Taking the FFT.");
 				//take the FFT
 				FFTData[] freqMag = FFT.getMag(channelOne, 44100); // TODO: don't hardcode
@@ -83,7 +86,7 @@ public class Encoder {
 					//edit the data thats going to be ifft'd
 					for (int i = 0 ; i<freqs.length ; i++) {
 						if (Math.abs(Math.abs(freqs[i])-20000)<5) { //lets try changing a set freq
-							 complexMags[i] = new Complex(15, 0); // don't hardcode
+							complexMags[i] = new Complex(15, 0); // don't hardcode
 						}
 					}
 
@@ -91,18 +94,18 @@ public class Encoder {
 					Complex[] ifft = FFT.ifft(complexMags);
 
 					//change ifft data from complex to real. put in fft class?
-					double[] ifftReal = new double[ifft.length]; 
+					double[] ifftReal = new double[ifft.length];
 					for (int i = 0 ; i < ifftReal.length ; i++) {
 						ifftReal[i]=ifft[i].re();
 					}
 
 					double[] toWrite = AudioTool.interleaveSamples(ifftReal);
 					System.arraycopy(toWrite, 0, out, bytesRead-bytesToRead, toWrite.length); //add to the array thats going to be written out
-					currentBit++; 	
+					currentBit++;
 				} else if (messageAsBits[currentBit] == 0 && !isRest) {
 					//add a 0 to the message
 					System.arraycopy(samples, 0, out, bytesRead-bytesToRead, samples.length);
-					currentBit++; 
+					currentBit++;
 				} else if (isRest) { // similar to encoding a zero, but don't increment the bit count
 					System.arraycopy(samples, 0, out, bytesRead-bytesToRead, samples.length);
 				}
@@ -123,14 +126,13 @@ public class Encoder {
 				outFloat[i] = (float) out[i];
 			}
             Write.audio(outFloat, outPath);*/
-            File outFile = new File(outPath);
-            AudioSampleWriter audioWriter = new AudioSampleWriter(outFile, 
-            										sampleReader.getFormat(), AudioFileFormat.Type.WAVE);
-       		audioWriter.write(out);
-        	audioWriter.close();
-        } catch (Exception e) {
-        	e.printStackTrace();
-        }
+			File outFile = new File(outPath);
+			AudioSampleWriter audioWriter = new AudioSampleWriter(outFile, sampleReader.getFormat(), AudioFileFormat.Type.WAVE);
+			audioWriter.write(out);
+			audioWriter.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	public static void main(String args[]) throws IOException, UnsupportedAudioFileException {
