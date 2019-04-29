@@ -2,7 +2,6 @@ package audiosteganography;
 
 import java.io.File;
 import audiosteganography.audio.*;
-import jm.util.*;
 
 public final class AudioQualityTest {
 	public static void main(String[] args) throws Exception {

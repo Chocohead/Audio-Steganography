@@ -5,6 +5,8 @@
 package audiosteganography;
 
 import java.io.File;
+import java.io.IOException;
+
 import audiosteganography.audio.AudioSampleReader;
 import audiosteganography.audio.AudioSampleWriter;
 import audiosteganography.audio.AudioTool;
@@ -21,7 +23,7 @@ public class Test {
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException, UnsupportedAudioFileException {
         String message = args[0];
         String filePath = args[1];
         String outPath = filePath.substring(0, filePath.length() - 4) + "-Encoded.wav";

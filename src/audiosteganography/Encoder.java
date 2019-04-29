@@ -9,6 +9,7 @@ import audiosteganography.fourier.Complex;
 import audiosteganography.fourier.FFT;
 import audiosteganography.fourier.FFTData;
 import audiosteganography.fourier.FFTDataAnalyzer;
+import audiosteganography.util.AudioFile;
 import audiosteganography.binary.BinaryTool;
 import jm.util.*;
 
@@ -19,10 +20,10 @@ public class Encoder {
 		this.audioFile = audioFile;
 	}
 
-	public void encodeMessage(String message, String outPath) { //change outPath to File
+	public void encodeMessage(String message, String outPath) throws IOException, UnsupportedAudioFileException { //change outPath to File
 		int[] messageAsBits = BinaryTool.ASCIIToBinary(message).getIntArray();
 		int currentBit = 0;
-        	float[] dataFloat = Read.audio(audioFile.getAbsolutePath());     	
+        	float[] dataFloat = new AudioFile(audioFile).streamAll();     	
         	double[] audioData = new double[dataFloat.length];
         	for (int i = 0 ; i<dataFloat.length ; i++) {
         		audioData[i] = (double) dataFloat[i];
@@ -132,7 +133,7 @@ public class Encoder {
         }
 	}
 
-	public static void main(String args[]) {
+	public static void main(String args[]) throws IOException, UnsupportedAudioFileException {
 		String message = args[0];
 		String filePath = args[1];
 		String outPath = filePath.substring(0,filePath.length()-4)+"-Encoded.wav";

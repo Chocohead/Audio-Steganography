@@ -9,6 +9,7 @@ import audiosteganography.fourier.Complex;
 import audiosteganography.fourier.FFT;
 import audiosteganography.fourier.FFTData;
 import audiosteganography.fourier.FFTDataAnalyzer;
+import audiosteganography.util.AudioFile;
 import audiosteganography.binary.BinaryTool;
 import audiosteganography.binary.Binary;
 import jm.util.*;
@@ -25,7 +26,7 @@ public class EncoderImage {
 		int[] messageAsBits = binary.getIntArray();
 		System.out.println("Going to write " + binary.length() + " bits");
 		int currentBit = 0;
-        	float[] dataFloat = Read.audio(audioFile.getAbsolutePath());     	
+        	float[] dataFloat = new AudioFile(audioFile).streamAll();
         	double[] audioData = new double[dataFloat.length];
         	for (int i = 0 ; i<dataFloat.length ; i++) {
         		audioData[i] = (double) dataFloat[i];
