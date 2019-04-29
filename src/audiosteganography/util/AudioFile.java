@@ -219,6 +219,22 @@ public class AudioFile {
 	}
 
 	/**
+	 * Returns an array of all samples from the audio, equivalent to {@link #getSampleStream()}{@link AudioStream#all() .all()}
+	 *
+	 * @return An array of all samples from the audio
+	 *
+	 * @throws IllegalArgumentException If the number of frames is greater than {@link Integer#MAX_VALUE}
+	 * @throws IOException If an I/O Exception occurs reading the underlying audio file
+	 */
+	public float[] streamAll() throws IOException {
+		try {
+			return getSampleStream().all();
+		} catch (UnsupportedAudioFileException e) {
+			throw new RuntimeException("Impossible?", e);
+		}
+	}
+
+	/**
 	 * Gets the bit size of the audio
 	 *
 	 * @return The bit depth, will be either 8, 16, 24, or 32
